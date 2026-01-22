@@ -1,0 +1,17 @@
+# Slack CLI metadata (prevents local app IDs from being pushed)
+.slack/
+
+# Deno & Node dependencies
+/node_modules/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Build outputs
+dist/
+package/
+
+# Environment secrets (keeps your API keys safe)
+.env*
+!.env.sample
