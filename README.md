@@ -1,28 +1,42 @@
-# Slack Message Extractor
+# Slack Message Extractor (Pinterest Edition)
 
-The **Slack Message Extractor** provides a custom workflow step to capture Slack message text and send it to external tools like Google Sheets. It is specifically designed to solve the common issue where Slack Workflow Builder provides a "Message Link" instead of a raw "Channel ID."
+The **Slack Message Extractor** is a custom Slack Automation app that enables "Smart Extraction" of message content. It solves the technical limitation where Slack's Workflow Builder provides a "Message Link" instead of the raw IDs required for external integrations like Google Sheets.
 
 ---
 
 ## Table of Contents
-* [Setup](#setup)
-* [Install the Slack CLI](#install-the-slack-cli)
-* [Deploying the App](#deploying-the-app)
-* [Running Your Project Locally](#running-your-project-locally)
+* [Security & Scopes (CorpSec Overview)](#security--scopes-corpsec-overview)
+* [Prerequisites](#prerequisites)
+* [Installation](#installation)
+* [Setup & Environment Migration](#setup--environment-migration)
+* [Deployment Modes](#deployment-modes)
 * [Workflow Configuration](#workflow-configuration)
 * [Viewing Activity Logs](#viewing-activity-logs)
 * [Project Structure](#project-structure)
 
 ---
 
-## Setup
-Before getting started, ensure you have a development workspace where you have permission to install apps. 
+## Security & Scopes (CorpSec Overview)
+This app follows the principle of **Least Privilege**. It cannot scan your workspace or read messages automatically.
 
-> **Note:** The features in this project require that the workspace be part of a **Slack paid plan**.
+| Scope | Purpose | Security Guardrail |
+| :--- | :--- | :--- |
+| `channels:history` | To read the text of a message when triggered. | Only active in Public channels where the bot is invited. |
+| `groups:history` | To read text in private channels/war rooms. | Only active in Private channels where the bot is invited. |
+| `chat:write` | Allows the bot to post confirmation messages. | Limited to specific workflow responses. |
+| `channels:read` | To identify channel names/metadata. | Read-only access to basic channel info. |
+
+> **Note:** The bot has **zero access** to any channel until a user explicitly runs the `/invite @AppName` command.
 
 ---
 
-## Install the Slack CLI
+## Prerequisites
+* A Slack development workspace on a **Slack paid plan**.
+* Permission to install apps within your Slack Grid/Workspace.
+
+---
+
+## Installation
 To use this project, you need to install the **Slack CLI** and **Deno**.
 
 ### For Mac / Linux:
@@ -35,35 +49,50 @@ To use this project, you need to install the **Slack CLI** and **Deno**.
 
 ---
 
-## Deploying the App
-Once you have cloned this repository, login to your Slack account and deploy the app:
+## Setup & Environment Migration
+To move this app between **Personal**, **Sandbox**, and **Production** environments, follow these steps to ensure App IDs do not conflict.
 
-1. **Login to your Slack workspace:** `slack login`
-2. **Deploy the app to Slack's infrastructure:** `slack deploy`
+### 1. Fresh Start (Identity Reset)
+If you are cloning this to a new workspace (e.g., Pinterest Prod):
+1. **Delete the `.slack/` folder** if it exists in your directory. This folder stores the unique App ID; deleting it allows you to create a brand new bot identity.
+2. **Initialize:** Run `slack init`. When asked "Do you want to add an existing app?", select **No**.
+
+### 2. Workspace Authentication
+You must authorize the CLI for each specific Slack Grid/Workspace:
+* **Command:** `slack login`.
+* **Action:** In the browser window that opens, use the dropdown in the top-right to select the specific **Pinterest Workspace**.
 
 ---
 
-## Running Your Project Locally
-While building or testing, you can see changes in real-time. An app is recognized as the development version if the name has the string `(local)` appended.
-* **Run app locally:** `slack run`
+## Deployment Modes
+
+### Testing (Sandbox)
+Use this to see changes in real-time. The app will appear in Slack with a **(local)** suffix.
+* **Command:** `slack run`.
+* *Note: The app only works while this terminal command is running.*
+
+### Production (Pinterest)
+Use this to host the app permanently on Slack’s infrastructure.
+* **Command:** `slack deploy`.
+* *Note: This version runs 24/7 on Slack's servers and does not require your local machine to stay online.*
 
 ---
 
 ## Workflow Configuration
-After deploying, you must set up the workflow in Slack's **Workflow Builder**:
+After deploying, you must configure the step in **Slack Workflow Builder**:
 
-1. Create a new Workflow (e.g., triggered by an **Emoji Reaction**).
-2. Add the **Extract Message** step.
-3. **Map the Timestamp to:** `API timestamp of the reacted message`.
-4. **Map the Channel ID to:** `Link to the message that was reacted to`.
-
-> **Important:** You must invite the app to any channel where you want it to work by typing `/invite @Extract Message`.
+1. **Invite the Bot:** Go to your target channel and type `/invite @Extract Message`.
+2. **Add Step:** Create a new Workflow (e.g., triggered by an Emoji Reaction) and add the **Extract Message** step.
+3. **Smart Mapping:**
+    * **Timestamp:** Map to `API timestamp of the reacted message`.
+    * **Channel ID:** Map to `Link to the message` (Our custom logic extracts the ID from this link).
+4. **Output:** The "Extracted Text" variable can now be sent to Google Sheets or other steps.
 
 ---
 
 ## Viewing Activity Logs
-You can view the production logs of your application in real-time with the following command:
-`slack activity --tail`
+To monitor your production application in real-time or troubleshoot errors:
+`slack activity --tail`.
 
 ---
 
@@ -71,7 +100,8 @@ You can view the production logs of your application in real-time with the follo
 
 | File/Folder | Description |
 | :--- | :--- |
-| `functions/` | Contains `extract_message.ts`, the custom logic that pulls text from a message. Includes "Smart Extraction" to handle raw message links. |
-| `manifest.ts` | The app manifest containing configuration and `botScopes` (permissions) required to read message history. |
-| `assets/` | Contains the app icon used when the app is installed in your workspace. |
-| `.gitignore` | Prevents local Slack metadata (`.slack/`) and system files from being uploaded to your repository. |
+| `functions/` | Contains `extract_message.ts`, the custom logic that pulls text from a message and parses raw links. |
+| `manifest.ts` | The app manifest containing configuration and `botScopes` (permissions). |
+| `assets/` | Contains the app icon used when the app is installed. |
+| `.slack/` | **(Hidden)** Contains the unique App ID and hooks. **Do not commit to Git**. |
+| `.gitignore` | Prevents local metadata and system files from being uploaded to your repository. |
