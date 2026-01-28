@@ -1,107 +1,60 @@
-# Slack Message Extractor (Pinterest Edition)
+# Slack Message Extractor (Pinterest Production Edition)
 
-The **Slack Message Extractor** is a custom Slack Automation app that enables "Smart Extraction" of message content. It solves the technical limitation where Slack's Workflow Builder provides a "Message Link" instead of the raw IDs required for external integrations like Google Sheets.
-
----
-
-## Table of Contents
-* [Security & Scopes (CorpSec Overview)](#security--scopes-corpsec-overview)
-* [Prerequisites](#prerequisites)
-* [Installation](#installation)
-* [Setup & Environment Migration](#setup--environment-migration)
-* [Deployment Modes](#deployment-modes)
-* [Workflow Configuration](#workflow-configuration)
-* [Viewing Activity Logs](#viewing-activity-logs)
-* [Project Structure](#project-structure)
+The **Slack Message Extractor** is a high-integrity Slack Automation app designed for "Smart Extraction." It bridges the gap between Slack's Workflow Builder and external systems (like Google Sheets) by transforming a standard Message Link into actionable, audited data.
 
 ---
 
-## Security & Scopes (CorpSec Overview)
-This app follows the principle of **Least Privilege**. It cannot scan your workspace or read messages automatically.
+## 🛡️ Security & Compliance (CorpSec Overview)
+This application was built with a **Fail-Closed** architecture, ensuring data privacy and user accountability are enforced at the code level.
 
-| Scope | Purpose | Security Guardrail |
+### 1. Privacy Guardrails (Public-Only Policy)
+Unlike basic extractors, this app performs a metadata check via `conversations.info` to verify the `is_private` status of a channel.
+* **Metadata Enforcement:** Even if the bot is invited to a private channel, the function will block the extraction and notify the user that only Public channels are supported in v1.
+* **Scope Restriction:** The `manifest.ts` explicitly excludes `groups:history` (Private Channels) and `im:history` (Direct Messages) to follow the Principle of Least Privilege.
+
+### 2. Mandatory User Attestation
+To meet Pinterest's data handling requirements, the app enforces a **Preflight Notice**:
+* **Ephemeral Notice:** An unskippable legal disclaimer is sent to the user triggering the extraction.
+* **Responsibility Mapping:** If the notice cannot be delivered, the app terminates the process before any message content is read.
+
+### 3. Auditability & Accountability
+Every extraction creates a permanent "Paper Trail" in the destination (e.g., Google Sheets):
+* **Actor ID:** Logs exactly who triggered the extraction (Extracted by).
+* **Author ID:** Logs the original creator of the message (Message Author).
+* **Reactor Validation:** The app verifies that the user triggering the workflow is the same user who applied the emoji reaction, preventing unauthorized data movement.
+
+---
+
+## 🔑 Permissions (Least Privilege Model)
+
+| Scope | Purpose | Security Control |
 | :--- | :--- | :--- |
-| `channels:history` | To read the text of a message when triggered. | Only active in Public channels where the bot is invited. |
-| `groups:history` | To read text in private channels/war rooms. | Only active in Private channels where the bot is invited. |
-| `chat:write` | Allows the bot to post confirmation messages. | Limited to specific workflow responses. |
-| `channels:read` | To identify channel names/metadata. | Read-only access to basic channel info. |
-
-> **Note:** The bot has **zero access** to any channel until a user explicitly runs the `/invite @AppName` command.
+| `channels:history` | To read the text of the target message. | Limited to Public channels only. |
+| `channels:read` | To verify `is_private` status. | Used to block private channel data. |
+| `chat:write` | To deliver the Ephemeral Preflight Notice. | Visible only to the user moving the data. |
 
 ---
 
-## Prerequisites
-* A Slack development workspace on a **Slack paid plan**.
-* Permission to install apps within your Slack Grid/Workspace.
+## 🚀 Deployment & Migration
+
+### Environment Sync
+To ensure the bot identity is correct for the Pinterest Workspace:
+1. **Reset Identity:** Delete the local `.slack/` folder.
+2. **Login:** Run `slack login` and select the **Pinterest Grid/Workspace**.
+3. **Deploy:** Run `slack deploy` to host the app on Slack's secure infrastructure.
+
+### Workflow Setup
+1. **Invite:** `/invite @Extract Message` to the target public channel.
+2. **Trigger:** Configure a workflow using the **Emoji Reaction** trigger.
+3. **Map Variables:**
+    * **Message Link:** Map to the "Link to message" variable.
+    * **Actor User ID:** Map to the "User who reacted" variable.
+    * **Reaction Name:** Map to "The reaction used."
 
 ---
 
-## Installation
-To use this project, you need to install the **Slack CLI** and **Deno**.
-
-### For Mac / Linux:
-* **Install Deno:** `curl -fsSL https://deno.land/install.sh | sh`
-* **Install Slack CLI:** `curl -fsSL https://downloads.slack-edge.com/slack-cli/install.sh | bash`
-
-### For Windows (PowerShell):
-* **Install Deno:** `irm https://deno.land/install.ps1 | iex`
-* **Install Slack CLI:** `irm https://downloads.slack-edge.com/slack-cli/install-windows.ps1 | iex`
-
----
-
-## Setup & Environment Migration
-To move this app between **Personal**, **Sandbox**, and **Production** environments, follow these steps to ensure App IDs do not conflict.
-
-### 1. Fresh Start (Identity Reset)
-If you are cloning this to a new workspace (e.g., Pinterest Prod):
-1. **Delete the `.slack/` folder** if it exists in your directory. This folder stores the unique App ID; deleting it allows you to create a brand new bot identity.
-2. **Initialize:** Run `slack init`. When asked "Do you want to add an existing app?", select **No**.
-
-### 2. Workspace Authentication
-You must authorize the CLI for each specific Slack Grid/Workspace:
-* **Command:** `slack login`.
-* **Action:** In the browser window that opens, use the dropdown in the top-right to select the specific **Pinterest Workspace**.
-
----
-
-## Deployment Modes
-
-### Testing (Sandbox)
-Use this to see changes in real-time. The app will appear in Slack with a **(local)** suffix.
-* **Command:** `slack run`.
-* *Note: The app only works while this terminal command is running.*
-
-### Production (Pinterest)
-Use this to host the app permanently on Slack’s infrastructure.
-* **Command:** `slack deploy`.
-* *Note: This version runs 24/7 on Slack's servers and does not require your local machine to stay online.*
-
----
-
-## Workflow Configuration
-After deploying, you must configure the step in **Slack Workflow Builder**:
-
-1. **Invite the Bot:** Go to your target channel and type `/invite @Extract Message`.
-2. **Add Step:** Create a new Workflow (e.g., triggered by an Emoji Reaction) and add the **Extract Message** step.
-3. **Smart Mapping:**
-    * **Timestamp:** Map to `API timestamp of the reacted message`.
-    * **Channel ID:** Map to `Link to the message` (Our custom logic extracts the ID from this link).
-4. **Output:** The "Extracted Text" variable can now be sent to Google Sheets or other steps.
-
----
-
-## Viewing Activity Logs
-To monitor your production application in real-time or troubleshoot errors:
-`slack activity --tail`.
-
----
-
-## Project Structure
-
-| File/Folder | Description |
-| :--- | :--- |
-| `functions/` | Contains `extract_message.ts`, the custom logic that pulls text from a message and parses raw links. |
-| `manifest.ts` | The app manifest containing configuration and `botScopes` (permissions). |
-| `assets/` | Contains the app icon used when the app is installed. |
-| `.slack/` | **(Hidden)** Contains the unique App ID and hooks. **Do not commit to Git**. |
-| `.gitignore` | Prevents local metadata and system files from being uploaded to your repository. |
+## 📂 Project Structure
+* `manifest.ts`: Defines strict bot scopes and application metadata.
+* `functions/extract_message.ts`: Core logic containing the **Privacy Guard** and **Reactor Validation**.
+* `assets/`: Official application branding and icons.
+* `.gitignore`: Configured to prevent the leakage of `.slack/` App IDs or local Deno credentials.
